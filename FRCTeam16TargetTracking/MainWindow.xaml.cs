@@ -13,6 +13,16 @@ using System.Drawing;
 using System.Windows.Media.Imaging;
 using System.Drawing.Imaging;
 
+/*
+ TODO: 
+ * ADD FORM ELEMENTS FOR FINE TUNING DETECTION - (DONE)
+ * LOGIC TO DIFFERENTIATE BETWEEN GOALS
+ * LOGIC TO GET DEPTH/ERROR TO GOALS
+ * SUPPORT FOR WORKER CANCELLATION - (DONE)
+ * SAVE FORM PROPERTIES TO SETTINGS FILE
+ * CODE CLEAN UP
+*/
+
 namespace FRCTeam16TargetTracking
 {
     /// <summary>
@@ -28,6 +38,7 @@ namespace FRCTeam16TargetTracking
         private class FormPropBag
         {
             public Bitmap KImg { get; set; }
+            public string ImgFileName { get; set; }
             public bool ColorFilter { get; set; }
             public double BMin { get; set; }
             public double BMax { get; set; }
@@ -35,154 +46,187 @@ namespace FRCTeam16TargetTracking
             public double GMax { get; set; }
             public double RMin { get; set; }
             public double RMax { get; set; }
+            public double Threshold { get; set; }
+            public double ThresholdLinking { get; set; }
+            public double MinArea { get; set; }
+            public double ApproxPoly { get; set; }
+        }
+
+        private class DepthFramePropBag
+        {
+            public short[] RawData { get; set; }
+            public byte[] Pixels { get; set; }
+            public int DepthFrameWidth { get; set; }
+            public int DepthFrameHeight { get; set; }
         }
 
         [System.Runtime.InteropServices.DllImport("gdi32.dll")]
         public static extern bool DeleteObject(IntPtr hobject);
 
-        private BackgroundWorker bw;
-        private List<MCvBox2D> boxList = new List<MCvBox2D>();
-        private bool running = false;
-        private int cnt = 0;
-        private Image<Bgr, byte> img;
-        private Bitmap contImg;
+        private BackgroundWorker _processWorker;
+        private BackgroundWorker _depthWorker;
+        private List<MCvBox2D> _boxList = new List<MCvBox2D>();
+        private bool _runningImaging = false;
+        private bool _runningDepth = false;
+        private Image<Bgr, byte> _orgImg;
+        private Bitmap _contourImg;
+        private KinectSensor _kinectSensor;
+        private System.Windows.Threading.DispatcherTimer _imageRefreshTimer; 
+
+        private const string FORM_TITLE = "Image Processing";
 
         private void bw_ProcessImage(object sender, DoWorkEventArgs e)
         {
-            running = true;
-            FormPropBag formProps = (FormPropBag)e.Argument;
-
-            if (img != null)
+            if (_processWorker.CancellationPending)
             {
-                img.Dispose();
-                img = null;
+                _runningImaging = false;
+                e.Cancel = true;
+                return;
             }
 
-            img = new Image<Bgr, byte>(formProps.KImg).PyrDown().PyrUp();
-            img._SmoothGaussian(5);
+            _runningImaging = true;
+            FormPropBag formProps = (FormPropBag)e.Argument;
 
-            Image<Gray, byte> img2 = null;
-
-            if (formProps.ColorFilter)
+            if (_orgImg != null)
             {
-                img2 = img.InRange(new Bgr(formProps.BMin, formProps.GMin, formProps.RMin), new Bgr(formProps.BMax, formProps.GMax, formProps.RMax));
-                img2 = img2.PyrDown().PyrUp();
-                img2._SmoothGaussian(3);
+                _orgImg.Dispose();
+                _orgImg = null;
+            }
+
+            if (formProps.KImg != null)
+            {
+                _orgImg = new Image<Bgr, byte>(formProps.KImg).PyrDown().PyrUp();
             }
             else
             {
-                img2 = img.Convert<Gray, byte>();
+                _orgImg = new Image<Bgr, byte>(formProps.ImgFileName).PyrDown().PyrUp();
+            }
+            _orgImg._SmoothGaussian(3);
+
+            Image<Gray, byte> img = null;
+
+            if (formProps.ColorFilter)
+            {
+                img = _orgImg.InRange(new Bgr(formProps.BMin, formProps.GMin, formProps.RMin), new Bgr(formProps.BMax, formProps.GMax, formProps.RMax));
+                //img = img.PyrDown().PyrUp();
+                //img._SmoothGaussian(3);
+            }
+            else
+            {
+                img = _orgImg.Convert<Gray, byte>();
                 
             }
 
-            //using (Image<Gray, Byte> gray = img.Convert<Gray, Byte>().PyrDown().PyrUp())
-            //{
-                Gray cannyThreshold = new Gray(100);
-                Gray cannyThresholdLinking = new Gray(150);
-                using (Image<Gray, Byte> cannyEdges = img2.Canny(cannyThreshold, cannyThresholdLinking))
+            Gray cannyThreshold = new Gray(formProps.Threshold);
+            Gray cannyThresholdLinking = new Gray(formProps.ThresholdLinking);
+            using (Image<Gray, Byte> cannyEdges = img.Canny(cannyThreshold, cannyThresholdLinking))
+            {
+                _contourImg = cannyEdges.ToBitmap();
+                using (MemStorage storage = new MemStorage())
+                for (
+                    Contour<System.Drawing.Point> contours = cannyEdges.FindContours(
+                        Emgu.CV.CvEnum.CHAIN_APPROX_METHOD.CV_CHAIN_APPROX_SIMPLE,
+                        Emgu.CV.CvEnum.RETR_TYPE.CV_RETR_LIST,
+                        storage);
+                    contours != null;
+                    contours = contours.HNext)
                 {
-                    contImg = cannyEdges.ToBitmap();
-                    //contImg = img2.ToBitmap();
-                    using (MemStorage storage = new MemStorage())
-                    for (
-                        Contour<System.Drawing.Point> contours = cannyEdges.FindContours(
-                            Emgu.CV.CvEnum.CHAIN_APPROX_METHOD.CV_CHAIN_APPROX_SIMPLE,
-                            Emgu.CV.CvEnum.RETR_TYPE.CV_RETR_LIST,
-                            storage);
-                        contours != null;
-                        contours = contours.HNext)
+                    Contour<System.Drawing.Point> currentContour = contours.ApproxPoly(formProps.ApproxPoly, storage);
+
+                    if (currentContour.Total == 4)
                     {
-                        Contour<System.Drawing.Point> currentContour = contours.ApproxPoly(contours.Perimeter * 0.05, storage);
-
-                        if (currentContour.Total == 4)
+                        if (currentContour.Area > formProps.MinArea)
                         {
-                            if (currentContour.Area > 250)
+                            if (currentContour.BoundingRectangle.Width > currentContour.BoundingRectangle.Height)
                             {
-                                if (currentContour.BoundingRectangle.Width > currentContour.BoundingRectangle.Height)
+                                bool isRectangle = true;
+                                System.Drawing.Point[] pts = currentContour.ToArray();
+                                LineSegment2D[] edges = Emgu.CV.PointCollection.PolyLine(pts, true);
+
+                                for (int i = 0; i < edges.Length; i++)
                                 {
-                                    bool isRectangle = true;
-                                    System.Drawing.Point[] pts = currentContour.ToArray();
-                                    LineSegment2D[] edges = Emgu.CV.PointCollection.PolyLine(pts, true);
+                                    double angle = Math.Abs(edges[(i + 1) % edges.Length].GetExteriorAngleDegree(edges[i]));
 
-                                    for (int i = 0; i < edges.Length; i++)
+                                    if (angle < 85 || angle > 95)
                                     {
-                                        double angle = Math.Abs(edges[(i + 1) % edges.Length].GetExteriorAngleDegree(edges[i]));
-
-                                        if (angle < 80 || angle > 100)
-                                        {
-                                            isRectangle = false;
-                                            break;
-                                        }
+                                        isRectangle = false;
+                                        break;
                                     }
-                                    if (isRectangle)
-                                    {
-                                        boxList.Add(currentContour.GetMinAreaRect());
-                                    }
+                                }
+                                if (isRectangle)
+                                {
+                                    _boxList.Add(currentContour.GetMinAreaRect());
                                 }
                             }
                         }
                     }
                 }
+            }
 
-                e.Result = img;
-            //}
+            e.Result = img;
         }
 
         private void bw_ProcessComplete(object sender, RunWorkerCompletedEventArgs e)
         {
-            image2.Source = sourceFromBitmap(img.ToBitmap());
-            using (Image<Bgr, Byte> triangleRectangleImage = img.CopyBlank())
+            if (e.Cancelled) 
             {
-                foreach (MCvBox2D box in boxList)
+                return; 
+            }
+
+            image2.Source = sourceFromBitmap(_orgImg.ToBitmap());
+            using (Image<Bgr, Byte> rectangleImage = _orgImg.CopyBlank())
+            {
+                foreach (MCvBox2D box in _boxList)
                 {
-                    triangleRectangleImage.Draw(box, new Bgr(System.Drawing.Color.DarkOrange), 2);
+                    rectangleImage.Draw(box, new Bgr(System.Drawing.Color.DarkOrange), 2);
                 }
                 
                 if ((bool)!chkShowContours.IsChecked) {
-                    image1.Source = sourceFromBitmap(triangleRectangleImage.ToBitmap());
+                    image1.Source = sourceFromBitmap(rectangleImage.ToBitmap());
                 }
                 else
                 {
-                    image1.Source = sourceFromBitmap(contImg);
+                    image1.Source = sourceFromBitmap(_contourImg);
                 }
-                running = false;
+                _runningImaging = false;
             }
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            kinectSensorChooser1.KinectSensorChanged += new DependencyPropertyChangedEventHandler(kinectSensorChooser1_KinectSensorChanged);
+            SetFormDefaults();
+            StartKinectSensor();
         }
 
-        void kinectSensorChooser1_KinectSensorChanged(object sender, DependencyPropertyChangedEventArgs e)
+        private void StartKinectSensor()
         {
-
-            var oldSensor = (KinectSensor)e.OldValue;
-            if (oldSensor != null)
+            if (KinectSensor.KinectSensors.Count > 0)
             {
-                oldSensor.Stop();
-                oldSensor.AudioSource.Stop();
-            }
+                _kinectSensor = KinectSensor.KinectSensors[0];
+                _kinectSensor.DepthStream.Enable(DepthImageFormat.Resolution640x480Fps30);
+                _kinectSensor.ColorStream.Enable(ColorImageFormat.RgbResolution640x480Fps30);
+                _kinectSensor.AllFramesReady += new EventHandler<AllFramesReadyEventArgs>(newSensor_AllFramesReady);
+                _kinectSensor.Start();
 
-            var sensor = (KinectSensor)e.NewValue;
-            if (sensor == null)
-            {
-                return;
+                Title = FORM_TITLE + " - Kinect Connected";
             }
+            else
+            {
+                Title = FORM_TITLE + " - No Kinect Found";
+                chkOpenImage.IsChecked = true;
+                chkOpenImage.IsEnabled = false;
+                chkShowDepth.IsEnabled = false;
+                lblSelectImage1.Visibility = System.Windows.Visibility.Visible;
+                lblSelectImage2.Visibility = System.Windows.Visibility.Visible;
+            }
+        }
 
-            sensor.DepthStream.Enable(DepthImageFormat.Resolution320x240Fps30);
-            sensor.ColorStream.Enable(ColorImageFormat.RgbResolution640x480Fps30);
-            sensor.SkeletonStream.Enable(); //required to see players
-            sensor.AllFramesReady += new EventHandler<AllFramesReadyEventArgs>(newSensor_AllFramesReady);
-
-            try
-            {
-                sensor.Start();
-            }
-            catch (System.IO.IOException)
-            {
-                kinectSensorChooser1.AppConflictOccurred();
-            }
+        private void SetFormDefaults()
+        {
+            txtApproxPoly.Text = "10";
+            txtThreshold.Text = "100";
+            txtThresholdLinking.Text = "120";
+            txtMinArea.Text = "2500";
         }
 
         private System.Drawing.Bitmap BitmapFromSource(BitmapSource bitmapsource)
@@ -246,7 +290,7 @@ namespace FRCTeam16TargetTracking
         {
             using (ColorImageFrame colorFrame = e.OpenColorImageFrame())
             {
-                if (running)
+                if (_runningImaging)
                 {
                     return;
                 }
@@ -255,10 +299,10 @@ namespace FRCTeam16TargetTracking
                     return;
                 }
 
-                if (img != null)
+                if (_orgImg != null)
                 {
-                    img.Dispose();
-                    img = null;
+                    _orgImg.Dispose();
+                    _orgImg = null;
                 }
 
                 byte[] pixels = new byte[colorFrame.PixelDataLength];
@@ -267,97 +311,80 @@ namespace FRCTeam16TargetTracking
                 int stride = colorFrame.Width * 4;
                 BitmapSource bs = System.Windows.Media.Imaging.BitmapSource.Create(colorFrame.Width, colorFrame.Height, 96, 96, PixelFormats.Bgr32, null, pixels, stride);
 
-                boxList.Clear();
-
-                bw = new BackgroundWorker();
-                bw.DoWork += new DoWorkEventHandler(bw_ProcessImage);
-                bw.RunWorkerCompleted += new RunWorkerCompletedEventHandler(bw_ProcessComplete);
-
-                FormPropBag fpb = new FormPropBag();
-                fpb.KImg = BitmapFromSource(bs);
-                fpb.ColorFilter = (bool)chkColorFilter.IsChecked;
-                fpb.BMin = sdrBMin.Value;
-                fpb.BMax = sdrBMax.Value;
-                fpb.GMin = sdrGMin.Value;
-                fpb.GMax = sdrGMax.Value;
-                fpb.RMin = sdrRMin.Value;
-                fpb.RMax = sdrRMax.Value;
-
-                bw.RunWorkerAsync((object)fpb);
-                cnt++;
-                label1.Content = cnt;
+                InitImageProcess(BitmapFromSource(bs));
             }
 
-           /* using (DepthImageFrame depthFrame = e.OpenDepthImageFrame())
+            using (DepthImageFrame depthFrame = e.OpenDepthImageFrame())
             {
+                if (_runningDepth)
+                {
+                    return;
+                }
                 if (depthFrame == null)
                 {
                     return;
                 }
 
+                short[] rawDepthData = new short[depthFrame.PixelDataLength];
+                depthFrame.CopyPixelDataTo(rawDepthData);
 
-                byte[] pixels = GenerateColoredBytes(depthFrame);
+                byte[] pixels = new byte[depthFrame.Height * depthFrame.Width * 4];
 
-                //number of bytes per row width * 4 (B,G,R,Empty)
-                int stride = depthFrame.Width * 4;
+                DepthFramePropBag props = new DepthFramePropBag();
+                props.RawData = rawDepthData;
+                props.Pixels = pixels;
+                props.DepthFrameHeight = depthFrame.Height;
+                props.DepthFrameWidth = depthFrame.Width;
 
-                image1.Source = System.Windows.Media.Imaging.BitmapSource.Create(depthFrame.Width, depthFrame.Height, 96, 96, PixelFormats.Bgr32, null, pixels, stride);
-                
-
-                //testing
-                //Image<Gray, ushort> img = new Image<Gray, ushort>(640, 480, 640 * 2, depthFrame.); 
-
-                
-            }*/
-           // System.Threading.Thread.Sleep(10);
+                _depthWorker = new BackgroundWorker();
+                _depthWorker.DoWork += new DoWorkEventHandler(bw_DepthProcessImage);
+                _depthWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(bw_DepthProcessComplete);
+                _depthWorker.WorkerSupportsCancellation = true;
+                _depthWorker.RunWorkerAsync((object)props);
+            }
         }
 
-        /*private byte[] GenerateColoredBytes(DepthImageFrame depthFrame)
+        private void bw_DepthProcessImage(object sender, DoWorkEventArgs e)
         {
-
-            //get the raw data from kinect with the depth for every pixel
-            short[] rawDepthData = new short[depthFrame.PixelDataLength];
-            depthFrame.CopyPixelDataTo(rawDepthData);
-
-            //use depthFrame to create the image to display on-screen
-            //depthFrame contains color information for all pixels in image
-            //Height x Width x 4 (Red, Green, Blue, empty byte)
-            Byte[] pixels = new byte[depthFrame.Height * depthFrame.Width * 4];
-
-            //hardcoded locations to Blue, Green, Red (BGR) index positions       
+            if (_depthWorker.CancellationPending)
+            {
+                _runningDepth = false;
+                e.Cancel = true;
+                return;
+            }
+            _runningDepth = true;
+            DepthFramePropBag props = (DepthFramePropBag)e.Argument;
+            short[] rawDepthData = props.RawData;
+            byte[] pixels = props.Pixels;
+    
             const int BlueIndex = 0;
             const int GreenIndex = 1;
             const int RedIndex = 2;
 
             for (int depthIndex = 0, colorIndex = 0; depthIndex < rawDepthData.Length && colorIndex < pixels.Length; depthIndex++, colorIndex += 4)
             {
-                //get the player (requires skeleton tracking enabled for values)
-                int player = rawDepthData[depthIndex] & DepthImageFrame.PlayerIndexBitmask;
+                int depth = rawDepthData[depthIndex] >> DepthImageFrame.PlayerIndexBitmaskWidth;
 
-                //gets the depth value
-                int depth = rawDepthData[depthIndex] >> DepthImageFrame.PlayerIndexBitmaskWidth; //shift bits to right by 3
-
-                //if (MMToFeet(depth) <= .1)
-                //{
-                //    var g = MMToFeet(depth);
-                //    pixels[colorIndex + BlueIndex] = 255;
-                //    pixels[colorIndex + GreenIndex] = 255;
-                //    pixels[colorIndex + RedIndex] = 0;
-                //}
-                if (MMToFeet(depth) <= 3)
+                if (MMToFeet(depth) < 3)
+                {
+                    //unknown
+                    continue;
+                }
+                else if (MMToFeet(depth) >= 3 && MMToFeet(depth) <= 6)
                 {
                     pixels[colorIndex + BlueIndex] = 255;
                     pixels[colorIndex + GreenIndex] = 0;
                     pixels[colorIndex + RedIndex] = 0;
-
                 }
-                else if (MMToFeet(depth) > 3 && MMToFeet(depth) <= 6)
+                else if (MMToFeet(depth) > 6 && MMToFeet(depth) <= 10)
                 {
+
                     pixels[colorIndex + BlueIndex] = 0;
                     pixels[colorIndex + GreenIndex] = 255;
                     pixels[colorIndex + RedIndex] = 0;
                 }
-                else if (MMToFeet(depth) > 6 && MMToFeet(depth) <= 10)
+
+                else if (MMToFeet(depth) > 10 && MMToFeet(depth) <= 13)
                 {
 
                     pixels[colorIndex + BlueIndex] = 0;
@@ -365,34 +392,32 @@ namespace FRCTeam16TargetTracking
                     pixels[colorIndex + RedIndex] = 255;
                 }
 
-                else if (MMToFeet(depth) > 10 && MMToFeet(depth) <= 13)
-                {
+                props.Pixels = pixels;
+                e.Result = props;
+            }
+        }
 
-                    pixels[colorIndex + BlueIndex] = 255;
-                    pixels[colorIndex + GreenIndex] = 255;
-                    pixels[colorIndex + RedIndex] = 0;
-                }
-
-                //Color all players "gold"
-                if (player > 0)
-                {
-                    pixels[colorIndex + BlueIndex] = Colors.Gold.B;
-                    pixels[colorIndex + GreenIndex] = Colors.Gold.G;
-                    pixels[colorIndex + RedIndex] = Colors.Gold.R;
-                }
-
+        private void bw_DepthProcessComplete(object sender, RunWorkerCompletedEventArgs e)
+        {
+            if (e.Cancelled)
+            {
+                return;
             }
 
+            DepthFramePropBag props = (DepthFramePropBag)e.Result;
 
-            return pixels;
-        }*/
+            int stride = props.DepthFrameWidth * 4;
+            image3.Source = System.Windows.Media.Imaging.BitmapSource.Create(props.DepthFrameWidth, props.DepthFrameHeight, 96, 96, PixelFormats.Bgr32, null, props.Pixels, stride);
+
+            _runningDepth = false;
+        }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            StopKinect(kinectSensorChooser1.Kinect);
+            StopKinectSensor(_kinectSensor);
         }
 
-        private void StopKinect(KinectSensor sensor)
+        private void StopKinectSensor(KinectSensor sensor)
         {
             if (sensor != null)
             {
@@ -408,9 +433,156 @@ namespace FRCTeam16TargetTracking
             }
         }
 
-       /* private double MMToFeet(int mm)
+        private void btnBrowse_Click(object sender, RoutedEventArgs e)
+        {
+            Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog();
+            dlg.DefaultExt = ".png";
+            dlg.Filter = "PNG Files (*.png)|*.png|JPG Files (*.jpg)|*.jpg";
+            dlg.Multiselect = false;
+
+            if ((bool)dlg.ShowDialog())
+            {
+                lblSelectImage1.Visibility = System.Windows.Visibility.Hidden;
+                lblSelectImage2.Visibility = System.Windows.Visibility.Hidden;
+                StopKinectSensor(_kinectSensor);
+                txtFileName.Text = dlg.FileName;
+                _imageRefreshTimer = new System.Windows.Threading.DispatcherTimer();
+                _imageRefreshTimer.Tick += new EventHandler(timer_tick);
+                _imageRefreshTimer.Interval = new TimeSpan(0, 0, 1);
+                _imageRefreshTimer.Start();
+            }
+        }
+
+        private void timer_tick(object sender, EventArgs e)
+        {
+            if (!_runningImaging)
+            {
+                InitImageProcess(null);
+            }
+        }
+
+        private void InitImageProcess(Bitmap img)
+        {
+            _boxList.Clear();
+
+            FormPropBag fpb = new FormPropBag();
+            fpb.KImg = img;
+            fpb.ImgFileName = txtFileName.Text;
+            fpb.ColorFilter = (bool)chkColorFilter.IsChecked;
+            fpb.BMin = sdrBMin.Value;
+            fpb.BMax = sdrBMax.Value;
+            fpb.GMin = sdrGMin.Value;
+            fpb.GMax = sdrGMax.Value;
+            fpb.RMin = sdrRMin.Value;
+            fpb.RMax = sdrRMax.Value;
+            if (txtThreshold.Text.Length > 0) { fpb.Threshold = Convert.ToDouble(txtThreshold.Text); } else { fpb.Threshold = 0; }
+            if (txtThresholdLinking.Text.Length > 0) { fpb.ThresholdLinking = Convert.ToDouble(txtThresholdLinking.Text); } else { fpb.ThresholdLinking = 0; }
+            if (txtMinArea.Text.Length > 0) { fpb.MinArea = Convert.ToDouble(txtMinArea.Text); } else { fpb.MinArea = 0; }
+            if (txtApproxPoly.Text.Length > 0) { fpb.ApproxPoly = Convert.ToDouble(txtApproxPoly.Text); } else { fpb.ApproxPoly = 0; }
+
+            _processWorker = new BackgroundWorker();
+            _processWorker.DoWork += new DoWorkEventHandler(bw_ProcessImage);
+            _processWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(bw_ProcessComplete);
+            _processWorker.WorkerSupportsCancellation = true;
+            _processWorker.RunWorkerAsync((object)fpb);
+        }
+
+        private double MMToFeet(int mm)
         {
             return mm * .003281;
-        }*/
+        }
+
+        private void chkShowDepth_Click(object sender, RoutedEventArgs e)
+        {
+            if ((bool)chkShowDepth.IsChecked)
+            {
+                image3.Visibility = System.Windows.Visibility.Visible;
+            }
+            else
+            {
+                image3.Visibility = System.Windows.Visibility.Hidden;
+            }
+        }
+
+        private void chkOpenImage_Click(object sender, RoutedEventArgs e)
+        {
+            _processWorker.CancelAsync();
+            _depthWorker.CancelAsync();
+
+            if ((bool)chkOpenImage.IsChecked)
+            {
+                StopKinectSensor(_kinectSensor);
+                lblSelectImage1.Visibility = System.Windows.Visibility.Visible;
+                lblSelectImage2.Visibility = System.Windows.Visibility.Visible;
+                btnBrowse.IsEnabled = true;
+                chkShowDepth.IsEnabled = false;
+            }
+            else
+            {
+                if (_imageRefreshTimer != null) { _imageRefreshTimer.Stop(); }
+                StartKinectSensor();
+                lblSelectImage1.Visibility = System.Windows.Visibility.Hidden;
+                lblSelectImage2.Visibility = System.Windows.Visibility.Hidden;
+                btnBrowse.IsEnabled = false;
+                txtFileName.Text = "";
+                chkShowDepth.IsEnabled = false;
+            }
+        }
+
+        private void txtThreshold_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (txtThreshold.Text.Length == 0)
+            {
+                txtThreshold.Text = _thresholdTemp;
+            }
+        }
+
+        private void txtThresholdLinking_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (txtThresholdLinking.Text.Length == 0)
+            {
+                txtThresholdLinking.Text = _thresholdLinkingTemp;
+            }
+        }
+
+        private void txtMinArea_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (txtMinArea.Text.Length == 0)
+            {
+                txtMinArea.Text = _minAreaTemp;
+            }
+        }
+
+        private void txtApproxPoly_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (txtApproxPoly.Text.Length == 0)
+            {
+                txtApproxPoly.Text = _approxPolyTemp;
+            }
+        }
+
+        private string _thresholdTemp;
+        private void txtThreshold_GotFocus(object sender, RoutedEventArgs e)
+        {
+            _thresholdTemp = txtThreshold.Text;
+        }
+
+        private string _thresholdLinkingTemp;
+        private void txtThresholdLinking_GotFocus(object sender, RoutedEventArgs e)
+        {
+            _thresholdLinkingTemp = txtThresholdLinking.Text;
+        }
+
+        private string _minAreaTemp;
+        private void txtMinArea_GotFocus(object sender, RoutedEventArgs e)
+        {
+            _minAreaTemp = txtMinArea.Text;
+        }
+
+        private string _approxPolyTemp;
+        private void txtApproxPoly_GotFocus(object sender, RoutedEventArgs e)
+        {
+            _approxPolyTemp = txtApproxPoly.Text;
+        }
     }
 }

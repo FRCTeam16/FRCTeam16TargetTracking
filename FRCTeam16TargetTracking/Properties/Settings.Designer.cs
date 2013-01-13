@@ -22,5 +22,125 @@ namespace FRCTeam16TargetTracking.Properties {
                 return defaultInstance;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string BlueMin {
+            get {
+                return ((string)(this["BlueMin"]));
+            }
+            set {
+                this["BlueMin"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string BlueMax {
+            get {
+                return ((string)(this["BlueMax"]));
+            }
+            set {
+                this["BlueMax"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string GreenMin {
+            get {
+                return ((string)(this["GreenMin"]));
+            }
+            set {
+                this["GreenMin"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string GreenMax {
+            get {
+                return ((string)(this["GreenMax"]));
+            }
+            set {
+                this["GreenMax"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string RedMin {
+            get {
+                return ((string)(this["RedMin"]));
+            }
+            set {
+                this["RedMin"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string RedMax {
+            get {
+                return ((string)(this["RedMax"]));
+            }
+            set {
+                this["RedMax"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string Threshold {
+            get {
+                return ((string)(this["Threshold"]));
+            }
+            set {
+                this["Threshold"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ThresholdLinking {
+            get {
+                return ((string)(this["ThresholdLinking"]));
+            }
+            set {
+                this["ThresholdLinking"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string MinArea {
+            get {
+                return ((string)(this["MinArea"]));
+            }
+            set {
+                this["MinArea"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ApproxPoly {
+            get {
+                return ((string)(this["ApproxPoly"]));
+            }
+            set {
+                this["ApproxPoly"] = value;
+            }
+        }
     }
 }
