@@ -475,7 +475,14 @@ namespace FRCTeam16TargetTracking
             fpb.GMax = sdrGMax.Value;
             fpb.RMin = sdrRMin.Value;
             fpb.RMax = sdrRMax.Value;
-            if (txtThreshold.Text.Length > 0) { fpb.Threshold = Convert.ToDouble(txtThreshold.Text); } else { fpb.Threshold = 0; }
+            
+            if (txtThreshold.Text.Length > 0) { 
+                fpb.Threshold = Convert.ToDouble(txtThreshold.Text); 
+            } 
+            else 
+            { 
+                fpb.Threshold = 0;
+            }
             if (txtThresholdLinking.Text.Length > 0) { fpb.ThresholdLinking = Convert.ToDouble(txtThresholdLinking.Text); } else { fpb.ThresholdLinking = 0; }
             if (txtMinArea.Text.Length > 0) { fpb.MinArea = Convert.ToDouble(txtMinArea.Text); } else { fpb.MinArea = 0; }
             if (txtApproxPoly.Text.Length > 0) { fpb.ApproxPoly = Convert.ToDouble(txtApproxPoly.Text); } else { fpb.ApproxPoly = 0; }
