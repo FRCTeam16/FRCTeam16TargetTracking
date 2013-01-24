@@ -1,12 +1,10 @@
 ﻿<Window x:Class="FRCTeam16TargetTracking.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Image Processing" Height="514" Width="752"
-        xmlns:my="clr-namespace:Microsoft.Samples.Kinect.WpfViewers;assembly=Microsoft.Samples.Kinect.WpfViewers" Loaded="Window_Loaded" WindowStartupLocation="CenterScreen" WindowStyle="SingleBorderWindow" UseLayoutRounding="False" ResizeMode="CanMinimize">
+        Title="Image Processing" Height="514" Width="752" Loaded="Window_Loaded_1">
     <Grid Height="466" Width="720">
         
-        <my:KinectSensorChooser HorizontalAlignment="Left" Margin="223,467,0,0" Name="kinectSensorChooser1" VerticalAlignment="Top" Width="328" />
-        <my:KinectDepthViewer Visibility="Hidden" HorizontalAlignment="Left" Margin="390,491,0,0" Name="kinectDepthViewer1" VerticalAlignment="Top" Height="240" Width="320" Kinect="{Binding ElementName=kinectSensorChooser1, Path=Kinect}" />
+        
         <Image Height="229" HorizontalAlignment="Left" Margin="12,49,0,0" Name="image1" Stretch="Fill" VerticalAlignment="Top" Width="300" />
         <Image Height="229" HorizontalAlignment="Left" Margin="411,49,0,0" Name="image2" Stretch="Fill" VerticalAlignment="Top" Width="300" />
         <Label Content="Red Thresholds" Height="28" HorizontalAlignment="Left" Margin="187,362,0,0" Name="label2" VerticalAlignment="Top" />
@@ -18,8 +16,8 @@
         <Label Content="Blue Thresholds" Height="28" HorizontalAlignment="Left" Margin="561,362,0,0" Name="label8" VerticalAlignment="Top" />
         <Label Content="Min:" Height="28" HorizontalAlignment="Left" Margin="546,393,0,0" Name="label9" VerticalAlignment="Top" />
         <Label Content="Max:" Height="28" HorizontalAlignment="Left" Margin="546,427,0,0" Name="label10" VerticalAlignment="Top" />
-        <CheckBox Content="Show Contours" Height="16" HorizontalAlignment="Left" Margin="12,335,0,0" Name="chkShowContours" VerticalAlignment="Top" />
-        <CheckBox Content="Use Color Filter" Height="16" HorizontalAlignment="Left" Margin="12.933,362,0,0" Name="chkColorFilter" VerticalAlignment="Top" />
+        <CheckBox Content="Show Contours" Height="16" HorizontalAlignment="Left" Margin="12,314,0,0" Name="chkShowContours" VerticalAlignment="Top" Checked="chkShowContours_Checked" />
+        <CheckBox Content="Use Color Filter" Height="16" HorizontalAlignment="Left" Margin="12,337,0,0" Name="chkColorFilter" VerticalAlignment="Top" />
         <Slider Height="23" HorizontalAlignment="Left" Margin="258,393,0,0" VerticalAlignment="Top" Width="75" Maximum="255" Name="sdrRMin" ValueChanged="sdrRMin_ValueChanged" />
         <Slider Height="23" HorizontalAlignment="Left" Margin="258,427,0,0" Maximum="255" Name="sdrRMax" VerticalAlignment="Top" Width="75" ValueChanged="sdrRMax_ValueChanged" />
         <Slider Height="23" HorizontalAlignment="Left" Margin="448,395,0,0" Maximum="255" Name="sdrGMin" VerticalAlignment="Top" Width="75" ValueChanged="sdrGMin_ValueChanged" />
@@ -35,8 +33,6 @@
         <CheckBox Content="Use Image" Height="16" HorizontalAlignment="Left" Margin="38,14,0,0" Name="chkOpenImage" VerticalAlignment="Top" Click="chkOpenImage_Click" />
         <Button Content="Browse" Height="23" HorizontalAlignment="Right" Margin="0,10,19,0" Name="btnBrowse" VerticalAlignment="Top" Width="75" Click="btnBrowse_Click" />
         <TextBox Height="23" HorizontalAlignment="Right" Margin="0,10,100,0" Name="txtFileName" VerticalAlignment="Top" Width="491" Text="" IsEnabled="False" />
-        <CheckBox Content="Show Depth" Height="16" HorizontalAlignment="Left" Margin="12,308,0,0" Name="chkShowDepth" VerticalAlignment="Top" Click="chkShowDepth_Click" />
-        <Image Height="229" HorizontalAlignment="Left" Margin="12,49,0,0" Name="image3" Stretch="Fill" VerticalAlignment="Top" Width="300" Visibility="Hidden" />
         <Label Content="Select an image" Height="28" HorizontalAlignment="Left" Margin="108,152,0,0" Name="lblSelectImage1" VerticalAlignment="Top" Foreground="White" ForceCursor="False" Background="#FF070707" Visibility="Hidden" />
         <Label Background="#FF070707" Content="Select an image" ForceCursor="False" Foreground="White" Height="28" HorizontalAlignment="Left" Margin="516.393,152,0,0" Name="lblSelectImage2" VerticalAlignment="Top" Visibility="Hidden" />
         <Label Content="Threshold:" Height="28" HorizontalAlignment="Left" Margin="418,298,0,0" Name="label1" VerticalAlignment="Top" />
@@ -47,7 +43,11 @@
         <TextBox Height="23" HorizontalAlignment="Right" Margin="0,296,19,0" Name="txtMinArea" VerticalAlignment="Top" Width="53" TextChanged="txtMinArea_TextChanged" GotFocus="txtMinArea_GotFocus" />
         <Label Content="Approx Poly:" Height="28" HorizontalAlignment="Left" Margin="565,325,0,0" Name="label13" VerticalAlignment="Top" />
         <TextBox Height="23" HorizontalAlignment="Right" Margin="0,324,19,0" Name="txtApproxPoly" VerticalAlignment="Top" Width="53" TextChanged="txtApproxPoly_TextChanged" GotFocus="txtApproxPoly_GotFocus" />
-        <Rectangle Fill="Black" Height="1" HorizontalAlignment="Left" Margin="12,41,0,0" Name="rectangle2" Stroke="Black" VerticalAlignment="Top" Width="689" />
-        <Rectangle Fill="Black" Height="1" HorizontalAlignment="Left" Margin="12,289,0,0" Name="rectangle1" Stroke="Black" VerticalAlignment="Top" Width="689" />
+        <Rectangle Fill="Black" Height="2" HorizontalAlignment="Left" Margin="12,41,0,0" Name="rectangle2" Stroke="Black" VerticalAlignment="Top" Width="696" />
+        <Rectangle Fill="Black" Height="1" HorizontalAlignment="Left" Margin="12,289,0,0" Name="rectangle1" Stroke="Black" VerticalAlignment="Top" Width="696" />
+        <Image Height="229" HorizontalAlignment="Left" Margin="12,49,0,0" Name="image4" Stretch="Fill" VerticalAlignment="Top" Visibility="Visible" Width="300" />
+        <CheckBox Content="Process Image" Height="16" HorizontalAlignment="Left" Margin="12,360,0,0" Name="chkProcessImage" VerticalAlignment="Top" Click="chkProcessImage_Click" />
+        <Button Content="Show Debug" Height="23" HorizontalAlignment="Left" Margin="12,432,0,0" Name="btnOpenDebug" VerticalAlignment="Top" Width="75" Click="btnOpenDebug_Click" />
+        <CheckBox Content="Bypass Target Stream" Height="16" HorizontalAlignment="Left" Margin="12,383,0,0" Name="chkBypassTargetStream" VerticalAlignment="Top" />
     </Grid>
 </Window>
