@@ -22,7 +22,7 @@ using System.Threading.Tasks;
  * LOGIC TO DIFFERENTIATE BETWEEN GOALS (DONE - Targets Ordered Highest to Lowest)
  * LOGIC TO GET DEPTH/ERROR TO GOALS (DONE - Will Need Tweaking When Able To Test)
  * SUPPORT FOR WORKER CANCELLATION - (DONE)
- * SAVE FORM PROPERTIES TO SETTINGS FILE
+ * SAVE FORM PROPERTIES TO SETTINGS FILE (DONE)
  * CODE CLEAN UP
 */
 
@@ -53,12 +53,10 @@ namespace FRCTeam16TargetTracking
             public double ThresholdLinking { get; set; }
             public double MinArea { get; set; }
             public double ApproxPoly { get; set; }
+            public int Erode { get; set; }
+            public int Dilate { get; set; }
+            public int GaussianSmoothing { get; set; }
             public bool ProcessImage { get; set; }
-        }
-
-        private class TargetDetail
-        {
-            //nothing here yet
         }
 
         private class DepthFramePropBag
@@ -99,7 +97,6 @@ namespace FRCTeam16TargetTracking
 
             if (_processWorker.CancellationPending || !formProps.ProcessImage)
             {
-                _runningImaging = false;
                 e.Cancel = true;
                 return;
             }
@@ -123,10 +120,10 @@ namespace FRCTeam16TargetTracking
                 _orgImg = new Image<Bgr, byte>(formProps.ImgFileName).PyrDown().PyrUp();
             }
 
-            WriteToDebug("Applying Gaussian Blur");
-          //  _orgImg._SmoothGaussian(3);
-            _orgImg = _orgImg.Dilate(9);
-           // _orgImg = _orgImg.Erode(5);
+            WriteToDebug("Applying Gaussian Smoothing");
+            _orgImg._SmoothGaussian(formProps.GaussianSmoothing);
+            _orgImg = _orgImg.Dilate(formProps.Dilate);
+            _orgImg = _orgImg.Erode(formProps.Erode);
             
             Image<Gray, byte> img = null;
 
@@ -147,7 +144,7 @@ namespace FRCTeam16TargetTracking
             {
                 _contourImg = cannyEdges.ToBitmap();
                 WriteToDebug("Filter Contours Start");
-
+             
                 _boxList = ImageFilter.FilterContours(cannyEdges, formProps.MinArea, formProps.ApproxPoly);
             }
 
@@ -159,25 +156,28 @@ namespace FRCTeam16TargetTracking
         {
             if (e.Cancelled) 
             {
+                _runningImaging = false;
                 return; 
             }
 
             image2.Source = sourceFromBitmap(_orgImg.ToBitmap());
-            //System.Drawing.Color c = System.Drawing.Color.DarkOrange;
             using (Image<Bgr, Byte> rectangleImage = _orgImg)
             {
-               /* WriteToDebug("Highlighting Targets");
-                int i = 1;
-
-                //Parallel.ForEach(_boxList, box =>
-                foreach(MCvBox2D box in _boxList)
+                if ((bool)chkOpenImage.IsChecked)
                 {
-                    MCvFont f = new MCvFont(Emgu.CV.CvEnum.FONT.CV_FONT_HERSHEY_COMPLEX, 1.0, 1.0);
-                    _orgImg.Draw(i.ToString(), ref f, new System.Drawing.Point((int)box.center.X - 10, (int)box.center.Y + 10), new Bgr(TARGET_OUTLINE_COLOR));
+                    WriteToDebug("Highlighting Targets");
+                    int i = 1;
 
-                    _orgImg.Draw(box, new Bgr(TARGET_OUTLINE_COLOR), TARGET_OUTLINE_THICKNESS);
-                    i++;
-                }*/
+                    //Parallel.ForEach(_boxList, box =>
+                    foreach (MCvBox2D box in _boxList)
+                    {
+                        MCvFont f = new MCvFont(Emgu.CV.CvEnum.FONT.CV_FONT_HERSHEY_COMPLEX, 1.0, 1.0);
+                        _orgImg.Draw(i.ToString(), ref f, new System.Drawing.Point((int)box.center.X - 10, (int)box.center.Y + 10), new Bgr(TARGET_OUTLINE_COLOR));
+
+                        _orgImg.Draw(box, new Bgr(TARGET_OUTLINE_COLOR), TARGET_OUTLINE_THICKNESS);
+                        i++;
+                    }
+                }
 
                 if ((bool)chkShowContours.IsChecked)
                 {
@@ -187,12 +187,15 @@ namespace FRCTeam16TargetTracking
                 }
                 else
                 {
-                    //image4.Source = sourceFromBitmap(_orgImg.ToBitmap()); 
+                    if ((bool)chkOpenImage.IsChecked)
+                    {
+                        image4.Source = sourceFromBitmap(_orgImg.ToBitmap());
+                    }
                     image4.Visibility = Visibility.Visible;
                     image1.Visibility = Visibility.Hidden;
                 }
 
-                WriteToDebug("Image Process Complete (" + _stopwatch.Elapsed.TotalMilliseconds + ")");
+                WriteToDebug("Image Process Complete");
 
                 _stopwatch.Reset();
                 _stopwatch.Stop();
@@ -201,12 +204,6 @@ namespace FRCTeam16TargetTracking
                 _debugInfo.Length = 0;
                 _runningImaging = false;
             }
-        }
-
-        private void Window_Loaded(object sender, RoutedEventArgs e)
-        {
-            SetFormDefaults();
-            StartKinectSensor();
         }
 
         private void StartKinectSensor()
@@ -233,10 +230,98 @@ namespace FRCTeam16TargetTracking
 
         private void SetFormDefaults()
         {
-            txtApproxPoly.Text = "10";
-            txtThreshold.Text = "100";
-            txtThresholdLinking.Text = "120";
-            txtMinArea.Text = "250";
+            bool saveDefault = false;
+
+            if (Properties.Settings.Default.Threshold.Length == 0)
+            {
+                Properties.Settings.Default.Threshold = "100";
+                saveDefault = true;
+            }
+            if (Properties.Settings.Default.ThresholdLinking.Length == 0)
+            {
+                Properties.Settings.Default.ThresholdLinking = "120";
+                saveDefault = true;
+            }
+            if (Properties.Settings.Default.MinArea.Length == 0)
+            {
+                Properties.Settings.Default.MinArea = "250";
+                saveDefault = true;
+            }
+            if (Properties.Settings.Default.ApproxPoly.Length == 0)
+            {
+                Properties.Settings.Default.ApproxPoly = "10";
+                saveDefault = true;
+            }
+            if (Properties.Settings.Default.RedMin.Length == 0)
+            {
+                Properties.Settings.Default.RedMin = "0";
+                saveDefault = true;
+            }
+            if (Properties.Settings.Default.RedMax.Length == 0)
+            {
+                Properties.Settings.Default.RedMax = "0";
+                saveDefault = true;
+            }
+            if (Properties.Settings.Default.BlueMin.Length == 0)
+            {
+                Properties.Settings.Default.BlueMin = "0";
+                saveDefault = true;
+            }
+            if (Properties.Settings.Default.BlueMax.Length == 0)
+            {
+                Properties.Settings.Default.BlueMax = "0";
+                saveDefault = true;
+            }
+            if (Properties.Settings.Default.GreenMin.Length == 0)
+            {
+                Properties.Settings.Default.GreenMin = "0";
+                saveDefault = true;
+            }
+            if (Properties.Settings.Default.GreenMax.Length == 0)
+            {
+                Properties.Settings.Default.GreenMax = "0";
+                saveDefault = true;
+            }
+            if (Properties.Settings.Default.UseColorFilter.Length == 0)
+            {
+                Properties.Settings.Default.UseColorFilter = "False";
+                saveDefault = true;
+            }
+            if (Properties.Settings.Default.Erode.Length == 0)
+            {
+                Properties.Settings.Default.Erode = "0";
+                saveDefault = true;
+            }
+            if (Properties.Settings.Default.Dilate.Length == 0)
+            {
+                Properties.Settings.Default.Dilate = "0";
+                saveDefault = true;
+            }
+            if (Properties.Settings.Default.GSmoothing.Length == 0)
+            {
+                Properties.Settings.Default.GSmoothing = "3";
+                saveDefault = true;
+            }
+
+            if (saveDefault)
+            {
+                Properties.Settings.Default.Save();
+            }
+
+            txtThreshold.Text = Properties.Settings.Default.Threshold;
+            txtThresholdLinking.Text = Properties.Settings.Default.ThresholdLinking;
+            txtApproxPoly.Text = Properties.Settings.Default.ApproxPoly;
+            txtMinArea.Text = Properties.Settings.Default.MinArea;
+            sdrRMin.Value = Convert.ToDouble(Properties.Settings.Default.RedMin);
+            sdrRMax.Value = Convert.ToDouble(Properties.Settings.Default.RedMax);
+            sdrBMin.Value = Convert.ToDouble(Properties.Settings.Default.BlueMin);
+            sdrBMax.Value = Convert.ToDouble(Properties.Settings.Default.BlueMax);
+            sdrGMin.Value = Convert.ToDouble(Properties.Settings.Default.GreenMin);
+            sdrGMax.Value = Convert.ToDouble(Properties.Settings.Default.GreenMax);
+            chkColorFilter.IsChecked = Properties.Settings.Default.UseColorFilter.ToUpper() == "TRUE";
+            txtErode.Text = Properties.Settings.Default.Erode;
+            txtDilate.Text = Properties.Settings.Default.Dilate;
+            txtSmoothGaussian.Text = Properties.Settings.Default.GSmoothing;
 
             chkBypassTargetStream.IsEnabled = (bool)chkProcessImage.IsChecked;
             
@@ -327,10 +412,10 @@ namespace FRCTeam16TargetTracking
                 pixels = new byte[colorFrame.PixelDataLength];
                 colorFrame.CopyPixelDataTo(pixels);
                 BitmapSource bs = System.Windows.Media.Imaging.BitmapSource.Create(colorFrame.Width, colorFrame.Height, 96, 96, PixelFormats.Bgr32, null, pixels, colorFrame.Width * 4);
-                //if (!(bool)chkProcessImage.IsChecked)
-                //{
+                if (!(bool)chkProcessImage.IsChecked)
+                {
                     image2.Source = bs;
-                //}
+                }
 
                 InitImageProcess(BitmapFromSource(bs));
             }
@@ -375,45 +460,79 @@ namespace FRCTeam16TargetTracking
         {
             if (_depthWorker.CancellationPending)
             {
-                _runningDepth = false;
                 e.Cancel = true;
                 return;
             }
-            //_runningDepth = true;
-            DepthFramePropBag props = (DepthFramePropBag)e.Argument;
            
-            byte[] bitmapBits = props.Pixels;
+            DepthFramePropBag props = (DepthFramePropBag)e.Argument;
+
+            if (_boxList.Count == 0)
+            {
+                e.Result = props;
+                return;
+            }
 
             _kinectSensor.CoordinateMapper.MapDepthFrameToColorFrame(DepthImageFormat.Resolution640x480Fps30, props.DepthImagePixels, ColorImageFormat.RgbResolution640x480Fps30, _mappedDepthLocations);
 
-            for (int i = 0; i < props.RawData.Length; i++)
+            if (_boxList.Count > 0)
+            {
+                int boxIndex = 1;
+                foreach (MCvBox2D box in _boxList)
+                {
+                    boxIndex = _boxList.IndexOf(box) + 1;
+                    
+                    if (_mappedDepthLocations.ToList().Exists(c => c.X == Convert.ToInt32(box.center.X) && c.Y == (Convert.ToInt32((box.center.Y - (box.size.Height / 2) - 10)))))
+                    {
+                        //sometimes pulls same element twice, not sure why.. added .First
+                        ColorImagePoint cip = _mappedDepthLocations.First(c => c.X == Convert.ToInt32(box.center.X) && c.Y == (Convert.ToInt32((box.center.Y - (box.size.Height / 2) - 10))));
+
+                        if (cip != null)
+                        {
+                            int depthVal = props.RawData[_mappedDepthLocations.ToList().IndexOf(cip)] >> DepthImageFrame.PlayerIndexBitmaskWidth; //depthVal in mm
+
+                            if (depthVal >= 609)
+                            {
+                                _targetInfo.Append("box " + boxIndex + " Depth: " + depthVal.ToString() + "(Feet:" + Conversions.MMToFeet(depthVal) + ")" + "\n");
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            //bool targetDepthFound = false;
+
+            /*for (int i = 0; i < props.RawData.Length; i++)
             //Parallel.For(0, props.RawData.Length, i =>
             {
-                int depthVal = props.RawData[i] >> DepthImageFrame.PlayerIndexBitmaskWidth;
+                int depthVal = props.RawData[i] >> DepthImageFrame.PlayerIndexBitmaskWidth; //depthVal in mm
                 ColorImagePoint point = _mappedDepthLocations[i];
 
                 if (_boxList.Count > 0)
                 {
-                    int j = 1;
+                    int boxIndex = 1;
                     foreach (MCvBox2D box in _boxList)
                     {
+                        boxIndex = _boxList.IndexOf(box) + 1;
 
                         if ((Convert.ToInt32(box.center.X) == point.X) && (Convert.ToInt32((box.center.Y - (box.size.Height / 2) - 10)) == point.Y))
                         {
                             if (depthVal >= 609)
                             {
-                                Random rnd = new Random();
-                                int rndNum = rnd.Next();
-                                _targetInfo.Append("box " + j + " Depth: " + depthVal.ToString() + "(Feet:" + MMToFeet(depthVal) + ")" + "\n");
+                                _targetInfo.Append("box " + boxIndex + " Depth: " + depthVal.ToString() + "(Feet:" + Conversions.MMToFeet(depthVal) + ")" + "\n");
+                                targetDepthFound = true;
                             }
                         }
+                    }
 
-                        j++;
+                    if (boxIndex == _boxList.Count && targetDepthFound)
+                    {
+                        break;
                     }
                 }
-            }
+            }*/
 
-            props.Pixels = bitmapBits;
+           // props.Pixels = bitmapBits;
             e.Result = props;
 
             /*
@@ -429,6 +548,7 @@ namespace FRCTeam16TargetTracking
         {
             if (e.Cancelled)
             {
+                _runningDepth = false;
                 return;
             }
             
@@ -450,6 +570,7 @@ namespace FRCTeam16TargetTracking
                 }
 
                 image4.Source = sourceFromBitmap(rectangleImage.ToBitmap());
+                _debugWnd.SetTargetInfo("");
                 _debugWnd.SetTargetInfo(_targetInfo.ToString());
                 _targetInfo.Length = 0;
            }
@@ -482,7 +603,7 @@ namespace FRCTeam16TargetTracking
         {
             Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog();
             dlg.DefaultExt = ".png";
-            dlg.Filter = "PNG Files (*.png)|*.png|JPG Files (*.jpg)|*.jpg";
+            dlg.Filter = "Image Files (*.jpg, *.png, *gif)|*.jpg;*.png;*.gif|PNG Files (*.png)|*.png|JPG Files (*.jpg)|*.jpg|GIF Files (*.gif)|*.gif";
             dlg.Multiselect = false;
 
             if ((bool)dlg.ShowDialog())
@@ -509,8 +630,6 @@ namespace FRCTeam16TargetTracking
 
         private void InitImageProcess(Bitmap img)
         {
-            //_boxList.Clear();
-
             FormPropBag fpb = new FormPropBag();
             fpb.KImg = img;
             fpb.ImgFileName = txtFileName.Text;
@@ -522,33 +641,32 @@ namespace FRCTeam16TargetTracking
             fpb.RMin = sdrRMin.Value;
             fpb.RMax = sdrRMax.Value;
             fpb.ProcessImage = (bool)chkProcessImage.IsChecked;
-            
-            if (txtThreshold.Text.Length > 0) { 
-                fpb.Threshold = Convert.ToDouble(txtThreshold.Text); 
-            } 
-            else 
-            { 
-                fpb.Threshold = 0;
-            }
+            if (txtErode.Text.Length > 0) { fpb.Erode = Convert.ToInt32(txtErode.Text); } else { fpb.Erode = 0; }
+            if (txtDilate.Text.Length > 0) { fpb.Dilate = Convert.ToInt32(txtDilate.Text); } else { fpb.Dilate = 0; }
+            if (txtThreshold.Text.Length > 0) { fpb.Threshold = Convert.ToDouble(txtThreshold.Text); } else { fpb.Threshold = 0; }
             if (txtThresholdLinking.Text.Length > 0) { fpb.ThresholdLinking = Convert.ToDouble(txtThresholdLinking.Text); } else { fpb.ThresholdLinking = 0; }
             if (txtMinArea.Text.Length > 0) { fpb.MinArea = Convert.ToDouble(txtMinArea.Text); } else { fpb.MinArea = 0; }
             if (txtApproxPoly.Text.Length > 0) { fpb.ApproxPoly = Convert.ToDouble(txtApproxPoly.Text); } else { fpb.ApproxPoly = 0; }
+
+            if (txtSmoothGaussian.Text.Length > 0) {
+                if (Convert.ToInt32(txtSmoothGaussian.Text) % 2 == 0)
+                {
+                    int newVal = Convert.ToInt32(txtSmoothGaussian.Text) + 1;
+                    txtSmoothGaussian.Text = newVal.ToString();
+                }
+
+                fpb.GaussianSmoothing = Convert.ToInt32(txtSmoothGaussian.Text); 
+            } 
+            else 
+            {
+                fpb.GaussianSmoothing = 1; 
+            }
 
             _processWorker = new BackgroundWorker();
             _processWorker.DoWork += new DoWorkEventHandler(bw_ProcessImage);
             _processWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(bw_ProcessComplete);
             _processWorker.WorkerSupportsCancellation = true;
             _processWorker.RunWorkerAsync((object)fpb);
-        }
-
-        private double MMToFeet(int mm)
-        {
-            return mm * .003281;
-        }
-
-        private double InchesToMM(int mm)
-        {
-            return mm / 0.039370;
         }
 
         private void chkOpenImage_Click(object sender, RoutedEventArgs e)
@@ -665,6 +783,29 @@ namespace FRCTeam16TargetTracking
                 chkBypassTargetStream.IsEnabled = false;
                 chkBypassTargetStream.IsChecked = false;
             }
+        }
+
+        private void btnSave_Click(object sender, RoutedEventArgs e)
+        {
+            btnSave.IsEnabled = false;
+            Properties.Settings.Default.Threshold = txtThreshold.Text;
+            Properties.Settings.Default.ThresholdLinking = txtThresholdLinking.Text;
+            Properties.Settings.Default.MinArea = txtMinArea.Text;
+            Properties.Settings.Default.ApproxPoly = txtApproxPoly.Text;
+            Properties.Settings.Default.RedMin = sdrRMin.Value.ToString();
+            Properties.Settings.Default.RedMax = sdrRMax.Value.ToString();
+            Properties.Settings.Default.BlueMin = sdrBMin.Value.ToString();
+            Properties.Settings.Default.BlueMax = sdrBMax.Value.ToString();
+            Properties.Settings.Default.GreenMin = sdrGMin.Value.ToString();
+            Properties.Settings.Default.GreenMax = sdrGMax.Value.ToString();
+            Properties.Settings.Default.UseColorFilter = chkColorFilter.IsChecked.ToString();
+            Properties.Settings.Default.Erode = txtErode.Text;
+            Properties.Settings.Default.Dilate = txtDilate.Text;
+            Properties.Settings.Default.GSmoothing = txtSmoothGaussian.Text;
+            Properties.Settings.Default.Save();
+
+            MessageBox.Show("Form Data Saved!", "Save", MessageBoxButton.OK, MessageBoxImage.Information);
+            btnSave.IsEnabled = true;
         }
     }
 }

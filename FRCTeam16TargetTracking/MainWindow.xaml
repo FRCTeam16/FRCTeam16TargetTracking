@@ -1,8 +1,8 @@
 ﻿<Window x:Class="FRCTeam16TargetTracking.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Image Processing" Height="514" Width="752" Loaded="Window_Loaded_1">
-    <Grid Height="466" Width="720">
+        Title="Image Processing" Height="554" Width="752" Loaded="Window_Loaded_1">
+    <Grid Height="500" Width="720">
         
         
         <Image Height="229" HorizontalAlignment="Left" Margin="12,49,0,0" Name="image1" Stretch="Fill" VerticalAlignment="Top" Width="300" />
@@ -35,10 +35,10 @@
         <TextBox Height="23" HorizontalAlignment="Right" Margin="0,10,100,0" Name="txtFileName" VerticalAlignment="Top" Width="491" Text="" IsEnabled="False" />
         <Label Content="Select an image" Height="28" HorizontalAlignment="Left" Margin="108,152,0,0" Name="lblSelectImage1" VerticalAlignment="Top" Foreground="White" ForceCursor="False" Background="#FF070707" Visibility="Hidden" />
         <Label Background="#FF070707" Content="Select an image" ForceCursor="False" Foreground="White" Height="28" HorizontalAlignment="Left" Margin="516.393,152,0,0" Name="lblSelectImage2" VerticalAlignment="Top" Visibility="Hidden" />
-        <Label Content="Threshold:" Height="28" HorizontalAlignment="Left" Margin="418,298,0,0" Name="label1" VerticalAlignment="Top" />
-        <TextBox Height="23" HorizontalAlignment="Right" Margin="0,298,178,0" Name="txtThreshold" VerticalAlignment="Top" Width="53" LostFocus="txtThreshold_LostFocus" GotFocus="txtThreshold_GotFocus" />
-        <Label Content="Threshold Linking:" Height="28" HorizontalAlignment="Left" Margin="377,325,0,0" Name="label11" VerticalAlignment="Top" />
-        <TextBox Height="23" HorizontalAlignment="Right" Margin="0,325,178,0" Name="txtThresholdLinking" VerticalAlignment="Top" Width="53" LostFocus="txtThresholdLinking_LostFocus" GotFocus="txtThresholdLinking_GotFocus" />
+        <Label Content="Threshold:" Height="28" HorizontalAlignment="Left" Margin="435,298,0,0" Name="label1" VerticalAlignment="Top" />
+        <TextBox Height="23" HorizontalAlignment="Right" Margin="0,298,161,0" Name="txtThreshold" VerticalAlignment="Top" Width="53" LostFocus="txtThreshold_LostFocus" GotFocus="txtThreshold_GotFocus" />
+        <Label Content="Threshold Linking:" Height="28" HorizontalAlignment="Left" Margin="394,325,0,0" Name="label11" VerticalAlignment="Top" />
+        <TextBox Height="23" HorizontalAlignment="Right" Margin="0,325,161,0" Name="txtThresholdLinking" VerticalAlignment="Top" Width="53" LostFocus="txtThresholdLinking_LostFocus" GotFocus="txtThresholdLinking_GotFocus" />
         <Label Content="Min Area:" Height="28" HorizontalAlignment="Left" Margin="581,296,0,0" Name="label12" VerticalAlignment="Top" />
         <TextBox Height="23" HorizontalAlignment="Right" Margin="0,296,19,0" Name="txtMinArea" VerticalAlignment="Top" Width="53" TextChanged="txtMinArea_TextChanged" GotFocus="txtMinArea_GotFocus" />
         <Label Content="Approx Poly:" Height="28" HorizontalAlignment="Left" Margin="565,325,0,0" Name="label13" VerticalAlignment="Top" />
@@ -47,7 +47,14 @@
         <Rectangle Fill="Black" Height="1" HorizontalAlignment="Left" Margin="12,289,0,0" Name="rectangle1" Stroke="Black" VerticalAlignment="Top" Width="696" />
         <Image Height="229" HorizontalAlignment="Left" Margin="12,49,0,0" Name="image4" Stretch="Fill" VerticalAlignment="Top" Visibility="Visible" Width="300" />
         <CheckBox Content="Process Image" Height="16" HorizontalAlignment="Left" Margin="12,360,0,0" Name="chkProcessImage" VerticalAlignment="Top" Click="chkProcessImage_Click" />
-        <Button Content="Show Debug" Height="23" HorizontalAlignment="Left" Margin="12,432,0,0" Name="btnOpenDebug" VerticalAlignment="Top" Width="75" Click="btnOpenDebug_Click" />
+        <Button Content="Show Debug" Height="23" HorizontalAlignment="Left" Margin="12,464,0,0" Name="btnOpenDebug" VerticalAlignment="Top" Width="75" Click="btnOpenDebug_Click" />
         <CheckBox Content="Bypass Target Stream" Height="16" HorizontalAlignment="Left" Margin="12,383,0,0" Name="chkBypassTargetStream" VerticalAlignment="Top" />
+        <Label Content="Dilate:" Height="28" HorizontalAlignment="Left" Margin="282,298,0,0" Name="label14" VerticalAlignment="Top" />
+        <TextBox Height="23" HorizontalAlignment="Right" Margin="0,298,336,0" Name="txtDilate" VerticalAlignment="Top" Width="53" />
+        <Label Content="Erode:" Height="28" HorizontalAlignment="Left" Margin="282,325,0,0" Name="label15" VerticalAlignment="Top" />
+        <TextBox Height="23" HorizontalAlignment="Right" Margin="0,325,336,0" Name="txtErode" VerticalAlignment="Top" Width="53" />
+        <Button Content="Save" Height="23" HorizontalAlignment="Left" Margin="633,464,0,0" Name="btnSave" VerticalAlignment="Top" Width="75" Click="btnSave_Click" />
+        <Label Content="G Smooth:" Height="28" HorizontalAlignment="Left" Margin="148,298,0,0" Name="label16" VerticalAlignment="Top" />
+        <TextBox Height="23" HorizontalAlignment="Right" Margin="0,298,451,0" Name="txtSmoothGaussian" VerticalAlignment="Top" Width="53" />
     </Grid>
 </Window>
